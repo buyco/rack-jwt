@@ -8,22 +8,11 @@ module Rack
       attr_reader :verify
       attr_reader :options
       attr_reader :exclude
+      attr_reader :token_param
 
       SUPPORTED_ALGORITHMS = %w(none HS256 HS384 HS512 RS256 RS384 RS512 ES256 ES384 ES512).freeze
       DEFAULT_ALGORITHM = 'HS256'.freeze
-
-      # The last segment gets dropped for 'none' algorithm since there is no
-      # signature so both of these patterns are valid. All character chunks
-      # are base64url format and periods.
-      #   Bearer abc123.abc123.abc123
-      #   Bearer abc123.abc123.
-      BEARER_TOKEN_REGEX = %r{
-        ^Bearer\s{1}(       # starts with Bearer and a single space
-        [a-zA-Z0-9\-\_]+\.  # 1 or more chars followed by a single period
-        [a-zA-Z0-9\-\_]+\.  # 1 or more chars followed by a single period
-        [a-zA-Z0-9\-\_]*    # 0 or more chars, no trailing chars
-        )$
-      }x
+      TOKEN_PARAM = 'auth_token'.freeze
 
       # Initialization should fail fast with an ArgumentError
       # if any args are invalid.
@@ -33,6 +22,7 @@ module Rack
         @verify  = opts.fetch(:verify, true)
         @options = opts.fetch(:options, {})
         @exclude = opts.fetch(:exclude, [])
+        @token_param = @options.fetch(:token_param, TOKEN_PARAM)
 
         @secret  = @secret.strip if @secret.is_a?(String)
         @options[:algorithm] = DEFAULT_ALGORITHM if @options[:algorithm].nil?
@@ -47,29 +37,50 @@ module Rack
       end
 
       def call(env)
-        if path_matches_excluded_path?(env)
-          @app.call(env)
-        elsif missing_auth_header?(env)
-          return_error('Missing Authorization header')
-        elsif invalid_auth_header?(env)
-          return_error('Invalid Authorization header format')
+        return @app.call(env) if path_matches_excluded_path?(env)
+
+        request = Rack::JWT::Request.new(env)
+
+        if missing_auth_token?(request)
+          return_error('Missing Authorization token')
         else
-          verify_token(env)
+          verify_token(env, request)
         end
       end
 
       private
 
-      def verify_token(env)
+      def redirect_without_token(request)
+        params = Rack::Utils.parse_nested_query(request.query_string).dup
+        params.delete('auth_token')
+        query_without_token = Rack::Utils.build_nested_query(params)
+
+        location = query_without_token.empty? ? request.path : "#{request.path}?#{query_without_token}"
+
+        cookie = Rack::Utils.add_cookie_to_header(nil, token_param, {value: request.token, path: '/'}) if request.from_params?
+
+        [302, {'Location' => location, 'Content-Type' => 'text/html', 'Set-Cookie' => cookie}, ['Moved Permanently']]
+      end
+
+      def verify_token(env, request)
         # extract the token from the Authorization: Bearer header
         # with a regex capture group.
-        token = BEARER_TOKEN_REGEX.match(env['HTTP_AUTHORIZATION'])[1]
+        token = request.token
 
         begin
           decoded_token = Token.decode(token, @secret, @verify, @options)
           env['jwt.payload'] = decoded_token.first
           env['jwt.header'] = decoded_token.last
+
+          #
+          # TODO add xss protection here ?
+          # TODO set expiration based on jwt expiration
+          #
+          return redirect_without_token(request) if request.from_params?
+          # Rack::Utils.set_cookie_header!(headers, token_param, {value: token, path: '/'}) if request.from_params?
+
           @app.call(env)
+
         rescue ::JWT::VerificationError
           return_error('Invalid JWT token : Signature Verification Error')
         rescue ::JWT::ExpiredSignature
@@ -160,16 +171,8 @@ module Rack
         @exclude.any? { |ex| env['PATH_INFO'].start_with?(ex) }
       end
 
-      def valid_auth_header?(env)
-        env['HTTP_AUTHORIZATION'] =~ BEARER_TOKEN_REGEX
-      end
-
-      def invalid_auth_header?(env)
-        !valid_auth_header?(env)
-      end
-
-      def missing_auth_header?(env)
-        env['HTTP_AUTHORIZATION'].nil? || env['HTTP_AUTHORIZATION'].strip.empty?
+      def missing_auth_token?(request)
+        !request.token?
       end
 
       def return_error(message)
