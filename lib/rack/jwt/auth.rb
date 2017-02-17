@@ -42,7 +42,12 @@ module Rack
         request = Rack::JWT::Request.new(env)
 
         if missing_auth_token?(request)
-          return_error('Missing Authorization token')
+          if request.xhr? || @options[:auth_url].nil?
+            return_error('Missing Authorization token')
+          else
+
+            [302, {'Location' => "#{@options[:auth_url]}?return_to=#{request.url}", 'Content-Type' => 'text/html'}, ['Moved Temporary']]
+          end
         else
           verify_token(env, request)
         end
