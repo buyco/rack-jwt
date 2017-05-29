@@ -45,8 +45,8 @@ module Rack
           if request.xhr? || @options[:auth_url].nil?
             return_error('Missing Authorization token')
           else
-
-            [302, {'Location' => "#{@options[:auth_url]}?return_to=#{request.url}", 'Content-Type' => 'text/html'}, ['Moved Temporary']]
+            return_to = @options[:auth_url_return_to] || request.url
+            [302, {'Location' => "#{@options[:auth_url]}?return_to=#{return_to}", 'Content-Type' => 'text/html'}, ['Moved Temporary']]
           end
         else
           verify_token(env, request)
