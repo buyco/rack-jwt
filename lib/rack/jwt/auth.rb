@@ -39,7 +39,7 @@ module Rack
       def call(env)
         return @app.call(env) if path_matches_excluded_path?(env)
 
-        request = Rack::JWT::Request.new(env)
+        request = Rack::JWT::Request.new(env, @options)
 
         if missing_auth_token?(request)
           if request.xhr? || @options[:auth_url].nil?
@@ -62,7 +62,11 @@ module Rack
 
         location = query_without_token.empty? ? request.path : "#{request.path}?#{query_without_token}"
 
-        cookie = Rack::Utils.add_cookie_to_header(nil, token_param, {value: request.token, path: '/'}) if request.from_params?
+        cookie_value = { value: request.token, path: '/' }
+        cookie_value[:domain] = @options[:cookie_domain] if @options[:cookie_domain]
+        cookie_value[:expires] = Time.now + @options[:cookie_expire_after] if @options[:cookie_expire_after]
+        cookie_key = @options[:cookie_key] || token_param
+        cookie = Rack::Utils.add_cookie_to_header(nil, cookie_key, cookie_value) if request.from_params?
 
         [302, {'Location' => location, 'Content-Type' => 'text/html', 'Set-Cookie' => cookie}, ['Moved Permanently']]
       end

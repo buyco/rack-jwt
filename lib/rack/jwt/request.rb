@@ -3,6 +3,8 @@ module Rack
     # Manage token in request object
     class Request < ::Rack::Request
 
+      attr_reader :options
+
       # The last segment gets dropped for 'none' algorithm since there is no
       # signature so both of these patterns are valid. All character chunks
       # are base64url format and periods.
@@ -16,10 +18,11 @@ module Rack
         )$
       }x
 
-      def intialize(env)
-        @from_header = false
-        @from_cookie = false
-        @from_params = false
+      def initialize(env, opts = {})
+        @from_header  = false
+        @from_cookie  = false
+        @from_params  = false
+        @options      = opts
         super(env)
       end
 
@@ -39,7 +42,6 @@ module Rack
         return @token if defined? @token # return nil if not auth token
 
         @token = extract_token_from_header || extract_token_from_cookie || extract_token_from_query_string
-        @token
       end
 
       def token?
@@ -52,8 +54,12 @@ module Rack
         token
       end
 
+      def cookie_key
+        @options[:cookie_key] || 'auth_token'
+      end
+
       def extract_token_from_cookie
-        token = cookies['auth_token'].strip if cookies['auth_token']
+        token = cookies[cookie_key].strip if cookies[cookie_key]
         @from_cookie = true
         token
       end
