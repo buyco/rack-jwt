@@ -9,7 +9,7 @@ Gem::Specification.new do |spec|
   spec.version       = Rack::JWT::VERSION
   spec.authors       = ['Mr. Eigenbart']
   spec.email         = ['eigenbart@gmail.com']
-  spec.summary       = 'Rack middleware that provides authentication based on JSON Web Tokens.'
+  spec.summary       = 'JWT authentication for Rack'
   spec.description   = 'Rack middleware that provides authentication based on JSON Web Tokens.'
   spec.homepage      = 'https://github.com/eigenbart/rack-jwt'
   spec.license       = 'MIT'
@@ -23,10 +23,10 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency 'bundler',   '~> 1.6'
   spec.add_development_dependency 'rake',      '~> 10.5'
   spec.add_development_dependency 'rack-test', '~> 0.6.3'
-  spec.add_development_dependency 'rspec',     '~> 3.4.0'
+  spec.add_development_dependency 'rspec',     '~> 3.4', '>= 3.4.0'
   spec.add_development_dependency 'simplecov', '~> 0.11.2'
   spec.add_development_dependency 'rubocop',   '~> 0.37.2'
 
-  spec.add_runtime_dependency 'rack', '>= 1.6.0'
-  spec.add_runtime_dependency 'jwt',  '~> 1.5.2'
+  spec.add_runtime_dependency 'rack', '~> 1.6', '>= 1.6.0'
+  spec.add_runtime_dependency 'jwt', '~> 1.5', '>= 1.5.2'
 end
