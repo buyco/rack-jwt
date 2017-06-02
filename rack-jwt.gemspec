@@ -27,6 +27,6 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency 'simplecov', '~> 0.11.2'
   spec.add_development_dependency 'rubocop',   '~> 0.37.2'
 
-  spec.add_runtime_dependency 'rack', '~> 1.6', '>= 1.6.0'
+  spec.add_runtime_dependency 'rack', '~> 2.0'
   spec.add_runtime_dependency 'jwt', '~> 1.5', '>= 1.5.2'
 end
