@@ -185,7 +185,7 @@ module Rack
       end
 
       def return_error(message)
-        body    = { error: message }.to_json
+        body    = { success: false, error: message }.to_json
         headers = { 'Content-Type' => 'application/json', 'Content-Length' => body.bytesize.to_s }
 
         [401, headers, [body]]
