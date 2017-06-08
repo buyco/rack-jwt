@@ -146,4 +146,78 @@ describe Rack::JWT::Auth do
       end
     end
   end
+
+  describe 'authorized roles' do
+    describe 'initilization' do
+      it 'raises an exception with invalid argument' do
+        args = { secret: secret, authorized_roles: 'foo' }
+        expect { Rack::JWT::Auth.new(inner_app, args) }.to raise_error(ArgumentError)
+
+        args = { secret: secret, authorized_roles: [''] }
+        expect { Rack::JWT::Auth.new(inner_app, args) }.to raise_error(ArgumentError)
+      end
+    end
+
+    describe 'token verification with one role' do
+      let(:app) { Rack::JWT::Auth.new(inner_app, { secret: secret, authorized_roles: ['myrole'] }) }
+
+      it 'refuses access when payload has no role' do
+        header 'Authorization', "Bearer #{issuer.encode(payload, secret, 'HS256')}"
+        get('/')
+        expect(last_response.status).to eq 401
+      end
+
+      it 'refuses access when payload role is not a string' do
+        payload = { role: { foo: 'bar'} }
+        header 'Authorization', "Bearer #{issuer.encode(payload, secret, 'HS256')}"
+        get('/')
+        expect(last_response.status).to eq 401
+      end
+
+      it 'refuses access when payload has a mismatch role' do
+        payload = { role: 'another_role' }
+        header 'Authorization', "Bearer #{issuer.encode(payload, secret, 'HS256')}"
+        get('/')
+        expect(last_response.status).to eq 401
+      end
+
+      it 'gives access to an authorized role' do
+        payload = { role: 'myrole' }
+        header 'Authorization', "Bearer #{issuer.encode(payload, secret, 'HS256')}"
+        get('/')
+        expect(last_response.status).to eq 200
+      end
+    end
+
+    describe 'token verification with several roles' do
+      let(:app) { Rack::JWT::Auth.new(inner_app, { secret: secret, authorized_roles: ['myrole1', 'myrole2'] }) }
+
+      it 'refuses access when payload has no role' do
+        header 'Authorization', "Bearer #{issuer.encode(payload, secret, 'HS256')}"
+        get('/')
+        expect(last_response.status).to eq 401
+      end
+
+      it 'refuses access when payload role is not a string' do
+        payload = { role: { foo: 'bar'} }
+        header 'Authorization', "Bearer #{issuer.encode(payload, secret, 'HS256')}"
+        get('/')
+        expect(last_response.status).to eq 401
+      end
+
+      it 'refuses access when payload has a mismatch role' do
+        payload = { role: 'another_role' }
+        header 'Authorization', "Bearer #{issuer.encode(payload, secret, 'HS256')}"
+        get('/')
+        expect(last_response.status).to eq 401
+      end
+
+      it 'gives access to an authorized role' do
+        payload = { role: 'myrole1' }
+        header 'Authorization', "Bearer #{issuer.encode(payload, secret, 'HS256')}"
+        get('/')
+        expect(last_response.status).to eq 200
+      end
+    end
+  end
 end

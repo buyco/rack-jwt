@@ -9,6 +9,7 @@ module Rack
       attr_reader :options
       attr_reader :exclude
       attr_reader :token_param
+      attr_reader :authorized_roles
 
       SUPPORTED_ALGORITHMS = %w(none HS256 HS384 HS512 RS256 RS384 RS512 ES256 ES384 ES512).freeze
       DEFAULT_ALGORITHM = 'HS256'.freeze
@@ -17,12 +18,13 @@ module Rack
       # Initialization should fail fast with an ArgumentError
       # if any args are invalid.
       def initialize(app, opts = {})
-        @app     = app
-        @secret  = opts.fetch(:secret, nil)
-        @verify  = opts.fetch(:verify, true)
-        @options = opts.fetch(:options, {})
-        @exclude = opts.fetch(:exclude, [])
-        @token_param = @options.fetch(:token_param, TOKEN_PARAM)
+        @app              = app
+        @secret           = opts.fetch(:secret, nil)
+        @verify           = opts.fetch(:verify, true)
+        @options          = opts.fetch(:options, {})
+        @exclude          = opts.fetch(:exclude, [])
+        @authorized_roles = opts.fetch(:authorized_roles, [])
+        @token_param      = @options.fetch(:token_param, TOKEN_PARAM)
 
         @secret  = @secret.strip if @secret.is_a?(String)
         @options[:algorithm] = DEFAULT_ALGORITHM if @options[:algorithm].nil?
@@ -34,6 +36,7 @@ module Rack
         check_options_type!
         check_valid_algorithm!
         check_exclude_type!
+        check_authorized_roles!
       end
 
       def call(env)
@@ -78,8 +81,11 @@ module Rack
 
         begin
           decoded_token = Token.decode(token, @secret, @verify, @options)
-          env['jwt.payload'] = decoded_token.first
+          payload = decoded_token.first
+          env['jwt.payload'] = payload
           env['jwt.header'] = decoded_token.last
+
+          raise Rack::JWT::RoleError unless @authorized_roles.empty? || @authorized_roles.include?(payload['role'])
 
           #
           # TODO add xss protection here ?
@@ -90,6 +96,8 @@ module Rack
 
           @app.call(env)
 
+        rescue Rack::JWT::RoleError
+          return_error('Unauthorized JWT token : unauthorized role')
         rescue ::JWT::VerificationError
           return_error('Invalid JWT token : Signature Verification Error')
         rescue ::JWT::ExpiredSignature
@@ -172,6 +180,22 @@ module Rack
 
           unless x.start_with?('/')
             raise ArgumentError, 'each exclude Array element must start with a /'
+          end
+        end
+      end
+
+      def check_authorized_roles!
+        unless @authorized_roles.is_a?(Array)
+          raise ArgumentError, 'authorized_roles argument must be an Array'
+        end
+
+        @authorized_roles.each do |x|
+          unless x.is_a?(String)
+            raise ArgumentError, 'each exclude Array element must be a String'
+          end
+
+          if x.empty?
+            raise ArgumentError, 'each exclude Array element must not be empty'
           end
         end
       end

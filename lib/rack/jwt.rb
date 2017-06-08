@@ -1,4 +1,5 @@
 require 'rack/jwt/version'
+require 'rack/jwt/error'
 
 module Rack
   # JSON Web Token

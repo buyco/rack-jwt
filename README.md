@@ -32,14 +32,16 @@ $ gem install rack-jwt
 
 `Rack::JWT::Auth` accepts several configuration options. All options are passed in a single Ruby Hash:
 
-* `secret` : required : `String` || `OpenSSL::PKey::RSA` || `OpenSSL::PKey::EC` : A cryptographically secure String (for HMAC algorithms) or a public key object of an appropriate type for public key algorithms. Set to `nil` if you are using the `'none'` algorithm.
+* `secret` (required): `String` || `OpenSSL::PKey::RSA` || `OpenSSL::PKey::EC` : A cryptographically secure String (for HMAC algorithms) or a public key object of an appropriate type for public key algorithms. Set to `nil` if you are using the `'none'` algorithm.
 
-* `verify` : optional : Boolean : Determines whether JWT will verify tokens keys for mismatch key types when decoded. Default is `true`. Set to `false` if you are using the `'none'` algorithm.
+* `verify` (optional, Boolean): Determines whether JWT will verify tokens keys for mismatch key types when decoded. Default is `true`. Set to `false` if you are using the `'none'` algorithm.
 
-* `options` : optional : Hash : A hash of options that are passed through to JWT to configure supported claims and algorithms. See [the ruby-jwt docs](https://github.com/progrium/ruby-jwt#support-for-reserved-claim-names) for much more info on the available options and how they work. These options are passed through without change to the underlying `ruby-jwt` gem. By default only expiration (exp) and Not Before (nbf) claims are verified. Pass in an algorithm choice like `{ algorithm: 'HS256' }`.
+* `options` (optional, Hash): A hash of options that are passed through to JWT to configure supported claims and algorithms. See [the ruby-jwt docs](https://github.com/progrium/ruby-jwt#support-for-reserved-claim-names) for much more info on the available options and how they work. These options are passed through without change to the underlying `ruby-jwt` gem. By default only expiration (exp) and Not Before (nbf) claims are verified. Pass in an algorithm choice like `{ algorithm: 'HS256' }`.
 
-* `exclude` : optional : Array : An Array of path strings representing paths that should not be checked for the presence of a valid JWT token. Excludes sub-paths as of specified paths as well (e.g. `%w(/docs)` excludes `/docs/some/thing.html` also). Each path should start with a `/`. If a path matches the current request path this entire middleware is skipped and no authentication or verification of tokens takes place.
+* `exclude` (optional, Array of strings): An Array of path strings representing paths that should not be checked for the presence of a valid JWT token. Excludes sub-paths as of specified paths as well (e.g. `%w(/docs)` excludes `/docs/some/thing.html` also). Each path should start with a `/`. If a path matches the current request path this entire middleware is skipped and no authentication or verification of tokens takes place.
 
+* `authorized_roles` (optional, Array of strings): An array of authorized roles, to check against a 'role' value given in the JWT payload. The access is forbidden if the payload doesn't contain an authorized role. 
+ 
 ## Example Server-Side Config
 
 Where `my_args` is a `Hash` containing valid keys. See `spec/example_spec.rb`
