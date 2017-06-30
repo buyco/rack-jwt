@@ -93,59 +93,107 @@ describe Rack::JWT::Auth do
         end
       end
 
-      describe 'when algorithm "none" and secret not nil but verify is false' do
-        it 'raises an exception' do
-          args = { secret: secret, verify: false, options: { algorithm: 'none' } }
-          expect { Rack::JWT::Auth.new(inner_app, args) }.to raise_error(ArgumentError)
-        end
+      it 'raises an exception when algorithm "none" and secret not nil but verify is false' do
+        args = { secret: secret, verify: false, options: { algorithm: 'none' } }
+        expect { Rack::JWT::Auth.new(inner_app, args) }.to raise_error(ArgumentError)
       end
 
-      describe 'when algorithm "none" and secret is nil but verify not false' do
-        it 'raises an exception' do
-          args = { secret: nil, verify: true, options: { algorithm: 'none' } }
-          expect { Rack::JWT::Auth.new(inner_app, args) }.to raise_error(ArgumentError)
-        end
+      it 'raises an exception when algorithm "none" and secret is nil but verify not false' do
+        args = { secret: nil, verify: true, options: { algorithm: 'none' } }
+        expect { Rack::JWT::Auth.new(inner_app, args) }.to raise_error(ArgumentError)
       end
 
-      describe 'when invalid algorithm provided' do
-        it 'raises an exception' do
-          args = { secret: secret, verify: true, options: { algorithm: 'badalg' } }
-          expect { Rack::JWT::Auth.new(inner_app, args) }.to raise_error(ArgumentError)
-        end
+      it 'raises an exception when invalid algorithm provided' do
+        args = { secret: secret, verify: true, options: { algorithm: 'badalg' } }
+        expect { Rack::JWT::Auth.new(inner_app, args) }.to raise_error(ArgumentError)
       end
     end
 
     # see also exclusion_spec.rb
     describe 'exclude' do
-      describe 'when a type other than Array provided' do
-        it 'raises an exception' do
-          args = { secret: secret, exclude: {} }
-          expect { Rack::JWT::Auth.new(inner_app, args) }.to raise_error(ArgumentError)
-        end
+      it 'raises an exception when a type other than Array provided' do
+        args = { secret: secret, exclude: {} }
+        expect { Rack::JWT::Auth.new(inner_app, args) }.to raise_error(ArgumentError)
       end
 
-      describe 'when Array contains non-String elements' do
-        it 'raises an exception' do
-          args = { secret: secret, exclude: ['/foo', nil, '/bar'] }
-          expect { Rack::JWT::Auth.new(inner_app, args) }.to raise_error(ArgumentError)
-        end
+      it 'raises an exception when Array contains non-String elements' do
+        args = { secret: secret, exclude: ['/foo', nil, '/bar'] }
+        expect { Rack::JWT::Auth.new(inner_app, args) }.to raise_error(ArgumentError)
       end
 
-      describe 'when Array contains empty String elements' do
-        it 'raises an exception' do
-          args = { secret: secret, exclude: ['/foo', '', '/bar'] }
-          expect { Rack::JWT::Auth.new(inner_app, args) }.to raise_error(ArgumentError)
-        end
+      it 'raises an exception when Array contains empty String elements' do
+        args = { secret: secret, exclude: ['/foo', '', '/bar'] }
+        expect { Rack::JWT::Auth.new(inner_app, args) }.to raise_error(ArgumentError)
       end
 
-      describe 'when Array contains elements that do not start with a /' do
-        it 'raises an exception' do
-          args = { secret: secret, exclude: ['/foo', 'bar', '/baz'] }
-          expect { Rack::JWT::Auth.new(inner_app, args) }.to raise_error(ArgumentError)
-        end
+      it 'raises an exception when Array contains elements that do not start with a /' do
+        args = { secret: secret, exclude: ['/foo', 'bar', '/baz'] }
+        expect { Rack::JWT::Auth.new(inner_app, args) }.to raise_error(ArgumentError)
       end
     end
+
+    describe 'include' do
+      it 'raises an exception when a type other than Array provided' do
+        args = { secret: secret, include: {} }
+        expect { Rack::JWT::Auth.new(inner_app, args) }.to raise_error(ArgumentError)
+      end
+
+      it 'raises an exception when Array contains non-String elements' do
+        args = { secret: secret, include: ['/foo', nil, '/bar'] }
+        expect { Rack::JWT::Auth.new(inner_app, args) }.to raise_error(ArgumentError)
+      end
+
+      it 'raises an exception when Array contains empty String elements' do
+        args = { secret: secret, include: ['/foo', '', '/bar'] }
+        expect { Rack::JWT::Auth.new(inner_app, args) }.to raise_error(ArgumentError)
+      end
+
+      it 'raises an exception when Array contains elements that do not start with a /' do
+        args = { secret: secret, include: ['/foo', 'bar', '/baz'] }
+        expect { Rack::JWT::Auth.new(inner_app, args) }.to raise_error(ArgumentError)
+      end
+    end
+
+    it 'raises an exception when given an include and exclude' do
+      args = { secret: secret, include: ['/foo'], exclude: ['/bar'] }
+      expect { Rack::JWT::Auth.new(inner_app, args) }.to raise_error(ArgumentError)
+    end
   end
+
+  describe 'when given excluded paths' do
+    let (:app) { Rack::JWT::Auth.new(inner_app, { secret: secret, exclude: ['/foo', '/bar'] }) }
+
+    it 'should authorize given paths without a valid token' do
+      get('/foo')
+      expect(last_response.status).to eq 200
+
+      get('/bar')
+      expect(last_response.status).to eq 200
+    end
+
+    it 'should forbid other paths without a valid token' do
+      get('/')
+      expect(last_response.status).to eq 401
+    end
+  end
+
+  describe 'when given included paths' do
+    let (:app) { Rack::JWT::Auth.new(inner_app, { secret: secret, include: ['/foo', '/bar'] }) }
+
+    it 'should forbid given paths without a valid token' do
+      get('/foo')
+      expect(last_response.status).to eq 401
+
+      get('/bar')
+      expect(last_response.status).to eq 401
+    end
+
+    it 'should authorize other paths without a valid token' do
+      get('/')
+      expect(last_response.status).to eq 200
+    end
+  end
+
 
   describe 'authorized roles' do
     describe 'initilization' do

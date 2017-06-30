@@ -4,12 +4,7 @@ module Rack
   module JWT
     # Authentication middleware
     class Auth
-      attr_reader :secret
-      attr_reader :verify
-      attr_reader :options
-      attr_reader :exclude
-      attr_reader :token_param
-      attr_reader :authorized_roles
+      attr_reader :secret, :verify, :options, :exclude, :include, :token_param, :authorized_roles
 
       SUPPORTED_ALGORITHMS = %w(none HS256 HS384 HS512 RS256 RS384 RS512 ES256 ES384 ES512).freeze
       DEFAULT_ALGORITHM = 'HS256'.freeze
@@ -23,6 +18,7 @@ module Rack
         @verify           = opts.fetch(:verify, true)
         @options          = opts.fetch(:options, {})
         @exclude          = opts.fetch(:exclude, [])
+        @include          = opts.fetch(:include, [])
         @authorized_roles = opts.fetch(:authorized_roles, [])
         @token_param      = @options.fetch(:token_param, TOKEN_PARAM)
 
@@ -35,12 +31,15 @@ module Rack
         check_verify_type!
         check_options_type!
         check_valid_algorithm!
-        check_exclude_type!
+        check_include_exclude_type!('exclude', @exclude)
+        check_include_exclude_type!('include', @include)
+        check_either_include_or_exclude!
         check_authorized_roles!
       end
 
       def call(env)
         return @app.call(env) if path_matches_excluded_path?(env)
+        return @app.call(env) unless path_matches_include_path?(env)
 
         request = Rack::JWT::Request.new(env, @options)
 
@@ -49,7 +48,14 @@ module Rack
             return_error('Missing Authorization token')
           else
             return_to = @options[:auth_url_return_to] || request.url
-            [302, {'Location' => "#{@options[:auth_url]}?return_to=#{return_to}", 'Content-Type' => 'text/html'}, ['Moved Temporary']]
+            [
+              302,
+              {
+                'Location' => "#{@options[:auth_url]}?return_to=#{return_to}",
+                'Content-Type' => 'text/html'
+              },
+              ['Moved Temporary']
+            ]
           end
         else
           verify_token(env, request)
@@ -164,24 +170,28 @@ module Rack
         end
       end
 
-      def check_exclude_type!
-        unless @exclude.is_a?(Array)
-          raise ArgumentError, 'exclude argument must be an Array'
+      def check_include_exclude_type!(attr_name, attr_value)
+        unless attr_value.is_a?(Array)
+          raise ArgumentError, "#{attr_name} argument must be an Array"
         end
 
-        @exclude.each do |x|
+        attr_value.each do |x|
           unless x.is_a?(String)
-            raise ArgumentError, 'each exclude Array element must be a String'
+            raise ArgumentError, "each #{attr_name} Array element must be a String"
           end
 
           if x.empty?
-            raise ArgumentError, 'each exclude Array element must not be empty'
+            raise ArgumentError, "each #{attr_name} Array element must not be empty"
           end
 
           unless x.start_with?('/')
-            raise ArgumentError, 'each exclude Array element must start with a /'
+            raise ArgumentError, "each #{attr_name} Array element must start with a /"
           end
         end
+      end
+
+      def check_either_include_or_exclude!
+        raise ArgumentError if @exclude.any? && @include.any?
       end
 
       def check_authorized_roles!
@@ -202,6 +212,11 @@ module Rack
 
       def path_matches_excluded_path?(env)
         @exclude.any? { |ex| env['PATH_INFO'].start_with?(ex) }
+      end
+
+      def path_matches_include_path?(env)
+        return true if @include.empty?
+        @include.any? { |ex| env['PATH_INFO'].start_with?(ex) }
       end
 
       def missing_auth_token?(request)
